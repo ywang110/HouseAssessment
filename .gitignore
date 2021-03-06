@@ -1,4 +1,6 @@
--# Permit ignore files.
+# Author: Yi Wang
+
+# Permit ignore files.
 !.gitattributes
 !.gitignore
 
@@ -6,7 +8,9 @@
 ## Source code files
 !*.py
 !*.sh
-!*.sql
+
+## MarkDown
+!*.md
 
 ## Config (YAML)
 !*.yaml
@@ -21,16 +25,13 @@
 !tox*.ini
 !MANIFEST.in
 
-# Presumed sensitive-data directories
-/data/
-
-# Additional specific files to exclude:
-data/
-
+# Ignore these files or folders.
 # IDE related
 .idea/
-.vscode/
 
-# Python
+# Path
 __pycache__/
 venv/
+
+# Data
+data/
