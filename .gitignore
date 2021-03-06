@@ -1,4 +1,4 @@
-# Permit ignore files.
+-# Permit ignore files.
 !.gitattributes
 !.gitignore
 
