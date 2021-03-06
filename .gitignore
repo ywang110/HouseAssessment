@@ -1,0 +1,35 @@
+# Permit ignore files.
+!.gitattributes
+!.gitignore
+
+# Permit these file extensions.
+## Source code files
+!*.py
+!*.sh
+!*.sql
+
+## Config (YAML)
+!*.yaml
+!*.yml
+
+## Python
+!requirements*.in
+!requirements*.txt
+
+## Python packaging files
+!setup.cfg
+!tox*.ini
+!MANIFEST.in
+
+# Presumed sensitive-data directories
+/data/
+
+# Additional specific files to exclude:
+data/
+
+# IDE related
+.idea/
+.vscode/
+
+# Python
+__pycache__/
