@@ -1,4 +1,4 @@
 # HouseAssessment
-The house assessment project for a test
+The house assessment project for an assignment
 
 Author: Yi Wang

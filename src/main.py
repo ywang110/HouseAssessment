@@ -117,7 +117,6 @@ def data_preprocessing():
     df['sale_month'] = tmp.month
     df['sale_day'] = tmp.day
     df['years_to_sale'] = int(datetime.today().year) - tmp.year
-
     df['sale_quarter'] = tmp.quarter
 
     ### use recent 10 years of data
@@ -157,28 +156,35 @@ def data_preprocessing():
     df['BSMTGARAGE'] = df['BSMTGARAGE'].apply(int)
     df['LOTAREA'] = df['LOTAREA'].apply(int)
 
-    ## adjust some numbers based on plots
+    # get sale price per square feet
+    df['sale_price_per_sf'] = df['SALEPRICE'] / df['FINISHEDLIVINGAREA']
 
-    # exchange 2 by 4, and 5 by 6 for roof
-    mask_tmp = (df['ROOF'] == 2)
-    mask_tmp_2 = (df['ROOF'] == 4)
-    df.loc[mask_tmp, 'ROOF'] = 4
-    df.loc[mask_tmp_2, 'ROOF'] = 2
+    ## adjust the order of some numbers based on plots
+    print(df[['sale_quarter', 'sale_price_per_sf']].groupby("sale_quarter").mean())
+    df_mean = df[['sale_quarter', 'sale_price_per_sf']].groupby("sale_quarter").mean()
+    new_index = df_mean.index.to_list()
+    df_mean.sort_values(by=['sale_price_per_sf'], inplace=True)
+    old_index = df_mean.index.to_list()
+    df['sale_quarter'] = df['sale_quarter'].replace(old_index, new_index)
 
-    mask_tmp = (df['ROOF'] == 5)
-    mask_tmp_2 = (df['ROOF'] == 6)
-    df.loc[mask_tmp, 'ROOF'] = 6
-    df.loc[mask_tmp_2, 'ROOF'] = 5
+    # adjust the order for roof
+    print(df[['ROOF', 'sale_price_per_sf']].groupby("ROOF").mean())
+    df_mean = df[['ROOF', 'sale_price_per_sf']].groupby("ROOF").mean()
+    new_index = df_mean.index.to_list()
+    df_mean.sort_values(by=['sale_price_per_sf'], inplace=True)
+    old_index = df_mean.index.to_list()
+    df['ROOF'] = df['ROOF'].replace(old_index, new_index)
 
-    mask_tmp = (df['sale_quarter'] == 2)
-    mask_tmp_2 = (df['sale_quarter'] == 3)
-    df.loc[mask_tmp, 'sale_quarter'] = 3
-    df.loc[mask_tmp_2, 'sale_quarter'] = 2
+    # keep copy of original sale month as sale_month_raw
+    df['sale_month_raw'] = df['sale_month']
 
-    mask_tmp = (df['sale_quarter'] == 4)
-    mask_tmp_2 = (df['sale_quarter'] == 2)
-    df.loc[mask_tmp, 'sale_quarter'] = 2
-    df.loc[mask_tmp_2, 'sale_quarter'] = 4
+    # adjust the order for sale month
+    print(df[['sale_month', 'sale_price_per_sf']].groupby("sale_month").mean())
+    df_mean = df[['sale_month', 'sale_price_per_sf']].groupby("sale_month").mean()
+    new_index = df_mean.index.to_list()
+    df_mean.sort_values(by=['sale_price_per_sf'], inplace=True)
+    old_index = df_mean.index.to_list()
+    df['sale_month'] = df['sale_month'].replace(old_index, new_index)
 
     # convert some categorical data into numerical ones
     df['GRADE'] = df['GRADE'].replace({'XX+': 1, 'XX': 2, 'XX-': 3,
@@ -193,14 +199,12 @@ def data_preprocessing():
 
     df['CDU'] = df['CDU'].replace({'EX': 1, 'VG': 2, 'GD': 3, 'AV': 4,
                                    'FR': 5, 'PR': 6, 'VP': 7, 'UN': 8,
-                                   'Unclear': 8
+                                   'Unclear': 9
                                    })
 
     # convert bath rooms
     df['bath'] = df['FULLBATHS'] + 0.5 * df['HALFBATHS']
 
-    # get sale price per square feet
-    df['sale_price_per_sf'] = df['SALEPRICE'] / df['FINISHEDLIVINGAREA']
 
     # ## outliner removal
     # df['z_score_sale_price'] = abs(df['SALEPRICE'] - np.mean(df['SALEPRICE']))/np.std(df['SALEPRICE'])
@@ -217,7 +221,7 @@ def data_preprocessing():
     df = df[df.columns[
         ~df.columns.isin(['YEARBLT', 'SALEDATE', 'FULLBATHS', 'HALFBATHS', 'z_score_sale_price'])]]
 
-    df = df.sort_values(by=['STYLEDESC', 'SCHOOLCODE', 'PROPERTYZIP', 'sale_year', 'sale_month', 'sale_day'], ascending=True).reset_index(drop=True)
+    df = df.sort_values(by=['STYLEDESC', 'SCHOOLCODE', 'PROPERTYZIP', 'sale_year', 'sale_month_raw', 'sale_day'], ascending=True).reset_index(drop=True)
 
     y = df['SALEPRICE']
     x = df.drop(columns=['SALEPRICE', 'sale_price_per_sf'])
@@ -234,7 +238,7 @@ def data_preprocessing():
     # ax = sn.lineplot(np.log(x['years_to_sale']), y / max(y), ci=80)
     # ax = sn.lineplot(np.log(x2['years_to_sale']), y2 / max(y2), ci=80)
 
-def knn_model():
+def knn_model(k=10):
 
     ##load model from trained lasso model
     model_file = parentPath + "/data/model"
@@ -244,11 +248,11 @@ def knn_model():
 
     df = pd.read_csv(parentPath + "/data/df_cleaned.csv")
 
-    df = df.sort_values(by=['STYLEDESC', 'SCHOOLCODE', 'PROPERTYZIP', 'sale_year', 'sale_month', 'sale_day'],
+    df = df.sort_values(by=['STYLEDESC', 'SCHOOLCODE', 'PROPERTYZIP', 'sale_year', 'sale_month_raw', 'sale_day'],
                         ascending=True).reset_index(drop=True)
 
-    x_col_removal = ['PROPERTYZIP', 'SCHOOLCODE', 'STYLEDESC', 'SALEPRICE', 'sale_price_per_sf', 'sale_year', 'sale_month', 'sale_day']
-    y_col = ['PROPERTYZIP', 'SCHOOLCODE', 'sale_year', 'sale_month', 'sale_day', 'SALEPRICE', 'sale_price_per_sf']
+    x_col_removal = ['PROPERTYZIP', 'SCHOOLCODE', 'STYLEDESC', 'SALEPRICE', 'sale_price_per_sf', 'sale_year', 'sale_month_raw', 'sale_day']
+    y_col = ['PROPERTYZIP', 'SCHOOLCODE', 'sale_year', 'sale_month_raw', 'sale_day', 'SALEPRICE', 'sale_price_per_sf']
     all_styles = pd.unique(df['STYLEDESC'])
 
     def knn_rolling(df):
@@ -263,7 +267,7 @@ def knn_model():
     for style in all_styles:
         ## the first 15 features are quality score features
         model_style = model[style]
-        quality_score_coeff = model_style.coef_[:15]
+        quality_score_coeff = model_style.coef_[:16] #model_style.coef_[:17]
 
         ## calculate quality score
         df_style = df[df['STYLEDESC'] == style]
@@ -279,9 +283,9 @@ def knn_model():
         df_style_y['market_score_lag'] = df_style_y['market_score'].shift(periods=1, fill_value=0)
 
         # use median value of 10 NN market score after removing max and min in NN
-        df_style_y.sort_values(by=['SCHOOLCODE', 'PROPERTYZIP', 'sale_year', 'sale_month', 'sale_day'], inplace=True)
+        df_style_y.sort_values(by=['SCHOOLCODE', 'PROPERTYZIP', 'sale_year', 'sale_month_raw', 'sale_day'], inplace=True)
         d = df_style_y.groupby(['SCHOOLCODE', 'PROPERTYZIP'])['market_score_lag']
-        s = d.rolling(window=10, center=False, min_periods=0).apply(lambda x: knn_rolling(x), raw=True).reset_index()
+        s = d.rolling(window=k, center=False, min_periods=0).apply(lambda x: knn_rolling(x), raw=True).reset_index()
         df_style_y.loc[:, 'knn_10_market_score'] = pd.DataFrame(data=s['market_score_lag'].to_numpy(), index=s['level_2'].to_numpy(), columns=['knn_10_market_score'])
         # reset index starting from 0
         df_style_x = df_style_x.reset_index(drop=True)
@@ -306,19 +310,23 @@ def knn_model():
 def regression_model():
     df = pd.read_csv(parentPath + "/data/df_cleaned.csv")
 
+    df = df.sort_values(by=['STYLEDESC', 'SCHOOLCODE', 'PROPERTYZIP', 'sale_year', 'sale_month_raw', 'sale_day'],
+                        ascending=True).reset_index(drop=True)
+
     # ## create dummy variables for categorical data
     #dummy_variables = ['PROPERTYZIP', 'SCHOOLCODE', 'sale_quarter']
     dummy_variables = ['PROPERTYZIP', 'SCHOOLCODE']
+    #dummy_quarter = pd.get_dummies(df['sale_quarter'], prefix='quarter')
     dummy_zip = pd.get_dummies(df['PROPERTYZIP'], prefix='zip')
     dummy_school = pd.get_dummies(df['SCHOOLCODE'], prefix='school')
-    #dummy_quarter = pd.get_dummies(df['sale_quarter'], prefix='quarter')
     # remove the first one of the dummy columns to avoid colinearity
+    #dummy_quarter = dummy_quarter[dummy_quarter.columns[~dummy_quarter.columns.isin(['quarter_1'])]]
     dummy_zip = dummy_zip[dummy_zip.columns[~dummy_zip.columns.isin(['zip_15003'])]]
     dummy_school = dummy_school[dummy_school.columns[~dummy_school.columns.isin(['school_1'])]]
-    #dummy_quarter = dummy_quarter[dummy_quarter.columns[~dummy_quarter.columns.isin(['quarter_1'])]]
-    # create final data
+    # remove categorical data after replacing by dummy variables
     df = df[df.columns[~df.columns.isin(dummy_variables)]]
-    #df = pd.concat([df, dummy_zip, dummy_school, dummy_quarter], axis=1)
+    # create final data
+    #df = pd.concat([df, dummy_quarter, dummy_zip, dummy_school], axis=1)
     df = pd.concat([df, dummy_zip, dummy_school], axis=1)
 
     ## split data into training and testing
@@ -333,7 +341,96 @@ def regression_model():
     y_predicted = {}
     model = {}
 
-    x_col_removal = ['STYLEDESC', 'SALEPRICE', 'sale_price_per_sf', 'sale_year', 'sale_month', 'sale_day']
+    x_col_removal = ['STYLEDESC', 'SALEPRICE', 'sale_price_per_sf', 'sale_year', 'sale_month_raw', 'sale_day']
+    y_col = 'sale_price_per_sf'
+    ## training one model for each STYLEDESC
+    all_styles = pd.unique(df['STYLEDESC'])
+    for style in all_styles:
+        style_df_train = df_train[df_train['STYLEDESC'] == style]
+        style_df_test = df_test[df_test['STYLEDESC'] == style]
+
+        if style_df_train is None or style_df_test is None or style_df_train.shape[0] == 0 or style_df_test.shape[0] == 0:
+            continue
+
+        ## for training data, remove the top and bottom 5% noise
+        qt_95 = style_df_train['sale_price_per_sf'].quantile(0.95)
+        qt_5 = style_df_train['sale_price_per_sf'].quantile(0.05)
+        style_df_train = style_df_train[(style_df_train['sale_price_per_sf'] < qt_95) & (style_df_train['sale_price_per_sf'] > qt_5)]
+
+        if style_df_train is None or style_df_test is None or style_df_train.shape[0] == 0 or style_df_test.shape[0] == 0:
+            continue
+
+        ##style_df_train[style_df_train.columns[~style_df_train.columns.isin(x_col_removal)]].to_csv("example_train.csv")
+
+        x_train[style] = style_df_train[style_df_train.columns[~style_df_train.columns.isin(x_col_removal)]].to_numpy()
+        y_train[style] = style_df_train[y_col].to_numpy()
+        x_test[style] = style_df_test[style_df_test.columns[~style_df_test.columns.isin(x_col_removal)]].to_numpy()
+        y_test[style] = style_df_test[y_col].to_numpy()
+
+        # model[style] = linear_model.LinearRegression(normalize=True)
+        # model[style].fit(x_train[style], y_train[style])
+        # y_predicted[style] = model[style].predict(x_test[style])
+        # print(style, 'cnt: ', y_test[style].shape[0], ' regression median abs error: ', np.median(abs(y_test[style] - y_predicted[style])/y_test[style]))
+
+        model[style] = RandomForestRegressor(max_depth=2, random_state=0)
+        model[style].fit(x_train[style], y_train[style])
+        y_predicted[style] = model[style].predict(x_test[style])
+        print(style, 'cnt: ', y_test[style].shape[0], ' RF median abs error: ',
+              np.median(abs(y_test[style] - y_predicted[style]) / y_test[style]))
+
+        model[style] = xgb.XGBRegressor(n_estimators=100, reg_lambda=1, gamma=0, max_depth=3)
+        model[style].fit(x_train[style], y_train[style])
+        y_predicted[style] = model[style].predict(x_test[style])
+        print(style, 'cnt: ', y_test[style].shape[0], ' xgboost median abs error: ',
+              np.median(abs(y_test[style] - y_predicted[style]) / y_test[style]))
+
+        model[style] = Lasso(alpha=0.001, normalize=True, max_iter=5000)
+        model[style].fit(x_train[style], y_train[style])
+        y_predicted[style] = model[style].predict(x_test[style])
+        print(style, 'cnt: ', y_test[style].shape[0], ' lasso median abs error: ', np.median(abs(y_test[style] - y_predicted[style]) / y_test[style]))
+
+    model_file = parentPath + "/data/model"
+    outfile = open(model_file, 'wb')
+    pickle.dump(model, outfile)
+    outfile.close()
+    #print(df)
+
+
+def school_market_regression_model():
+    df = pd.read_csv(parentPath + "/data/df_cleaned.csv")
+
+    df = df.sort_values(by=['STYLEDESC', 'SCHOOLCODE', 'PROPERTYZIP', 'sale_year', 'sale_month_raw', 'sale_day'],
+                        ascending=True).reset_index(drop=True)
+
+    # ## create dummy variables for categorical data
+    #dummy_variables = ['PROPERTYZIP', 'SCHOOLCODE', 'sale_quarter']
+    dummy_variables = ['PROPERTYZIP', 'SCHOOLCODE']
+    #dummy_quarter = pd.get_dummies(df['sale_quarter'], prefix='quarter')
+    dummy_zip = pd.get_dummies(df['PROPERTYZIP'], prefix='zip')
+    dummy_school = pd.get_dummies(df['SCHOOLCODE'], prefix='school')
+    # remove the first one of the dummy columns to avoid colinearity
+    #dummy_quarter = dummy_quarter[dummy_quarter.columns[~dummy_quarter.columns.isin(['quarter_1'])]]
+    dummy_zip = dummy_zip[dummy_zip.columns[~dummy_zip.columns.isin(['zip_15003'])]]
+    dummy_school = dummy_school[dummy_school.columns[~dummy_school.columns.isin(['school_1'])]]
+    # remove categorical data after replacing by dummy variables
+    df = df[df.columns[~df.columns.isin(dummy_variables)]]
+    # create final data
+    #df = pd.concat([df, dummy_quarter, dummy_zip, dummy_school], axis=1)
+    #df = pd.concat([df, dummy_zip, dummy_school], axis=1)
+
+    ## split data into training and testing
+    ## train the model 5 years before, and test the model for the recent 5 years
+    df_train = df[df['years_to_sale'] > 5]
+    df_test = df[df['years_to_sale'] <= 5]
+
+    x_train = {}
+    y_train = {}
+    x_test = {}
+    y_test = {}
+    y_predicted = {}
+    model = {}
+
+    x_col_removal = ['STYLEDESC', 'SALEPRICE', 'sale_price_per_sf', 'sale_year', 'sale_month_raw', 'sale_day']
     y_col = 'sale_price_per_sf'
     ## training one model for each STYLEDESC
     all_styles = pd.unique(df['STYLEDESC'])
@@ -394,4 +491,4 @@ if __name__ =="__main__":
     #
     # regression_model()
 
-    knn_model()
+    knn_model(k=10)
