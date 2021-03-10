@@ -1,20 +1,21 @@
 import pandas as pd
 import numpy as np
-from PricingModel import PricingModel
+from StyleModel import StyleModel
 
 
-class QualityModel(PricingModel):
+class QualityModel(StyleModel):
 
     def __init__(self):
         super().__init__()
 
         self.df_quality_model = {}
         self.df_test_quality_model = {}
-        self.model_name = "lasso_model"
+        self.model_name = "lasso_style_model"
 
     def learn_quality(self, k=10):
 
-        ##load model from trained lasso model
+        ##load model from trained lasso style model
+        self.model_name = "lasso_style_model"
         self.load_model(self.model_name)
 
         ##load cleaned dataframe

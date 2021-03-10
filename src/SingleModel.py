@@ -1,32 +1,31 @@
 import pandas as pd
 import numpy as np
 from sklearn.linear_model import Lasso
-from PricingModel import PricingModel
+from sklearn.ensemble import RandomForestRegressor
+import xgboost as xgb
+from StyleModel import StyleModel
 
 
-class SchoolRank(PricingModel):
+class SingleModel(StyleModel):
 
     def __init__(self):
         super().__init__()
 
         self.x_train = None
         self.y_train = None
-        self.x_test = {}
-        self.y_test = {}
-        self.y_predicted = {}
+        self.x_test = None
+        self.y_test = None
+        self.y_predicted = None
+        self.x_test_per_style = {}
+        self.y_test_per_style = {}
+        self.y_predicted_per_style = {}
         self.model = None
         self.all_styles = None
-        self.model_name = 'lasso_single_model'
+        self.model_name = None
         self.feature_columns = None
         self.rank = None
 
     def feature_engineering(self):
-
-        ## load cleaned dataframe
-        self.df = pd.read_csv(self.data_path + self.clean_file_name)
-
-        self.all_styles = pd.unique(self.df['STYLEDESC'])
-
         self.df = self.df.sort_values(by=['SCHOOLCODE', 'PROPERTYZIP', 'sale_year', 'sale_month_raw', 'sale_day'],
                                       ascending=True).reset_index(drop=True)
 
@@ -61,6 +60,8 @@ class SchoolRank(PricingModel):
         ## use a single model for training
         self.x_train = self.df_train[self.df_train.columns[~self.df_train.columns.isin(x_col_removal)]].to_numpy()
         self.y_train = self.df_train[y_col].to_numpy()
+        self.x_test = self.df_test[self.df_test.columns[~self.df_test.columns.isin(x_col_removal)]].to_numpy()
+        self.y_test = self.df_test[y_col].to_numpy()
 
         self.feature_columns = self.df_train[self.df_train.columns[~self.df_train.columns.isin(x_col_removal)]].columns
 
@@ -71,22 +72,47 @@ class SchoolRank(PricingModel):
 
             if style_df_test is None or style_df_test.shape[0] == 0:
                 continue
-            self.x_test[style] = style_df_test[style_df_test.columns[~style_df_test.columns.isin(x_col_removal)]].to_numpy()
-            self.y_test[style] = style_df_test[y_col].to_numpy()
+            self.x_test_per_style[style] = style_df_test[style_df_test.columns[~style_df_test.columns.isin(x_col_removal)]].to_numpy()
+            self.y_test_per_style[style] = style_df_test[y_col].to_numpy()
 
     def train_lasso(self):
         # train a single model
+        self.model_name = 'lasso_single_model'
         self.model = Lasso(alpha=0.001, normalize=True, max_iter=5000)
+        self.model.fit(self.x_train, self.y_train)
+
+        self.save_model(self.model_name)
+
+    def train_rf_regression(self):
+        # train a single model
+        self.model_name = 'rfg_single_model'
+        self.model = RandomForestRegressor(max_depth=2, random_state=0)
+        self.model.fit(self.x_train, self.y_train)
+
+        self.save_model(self.model_name)
+
+    def train_xgb(self):
+        # train a single model
+        self.model_name = 'xgb_single_model'
+        self.model = xgb.XGBRegressor(n_estimators=100, reg_lambda=1, gamma=0, max_depth=3)
         self.model.fit(self.x_train, self.y_train)
 
         self.save_model(self.model_name)
 
     def predict(self):
         self.load_model(self.model_name)
+
+        ## see by style data
         for style in self.all_styles:
-            self.y_predicted[style] = self.model.predict(self.x_test[style])
-            print(style, 'cnt: ', self.y_test[style].shape[0], ' ', self.model_name, ' median abs error: ',
-                  np.median(abs(self.y_test[style] - self.y_predicted[style]) / self.y_test[style]))
+            self.y_predicted_per_style[style] = self.model.predict(self.x_test_per_style[style])
+            print(style, 'cnt: ', self.y_test_per_style[style].shape[0], ' ', self.model_name, ' median abs error: ',
+                  np.median(abs(self.y_test_per_style[style] - self.y_predicted_per_style[style]) / self.y_test_per_style[style]))
+
+        ## see all data
+        self.y_predicted = self.model.predict(self.x_test)
+        print('All testing data cnt: ', self.y_test.shape[0], ' ', self.model_name, ' median abs error: ',
+              np.median(
+                  abs(self.y_test - self.y_predicted) / self.y_test))
 
     def school_rank(self):
         self.model = Lasso(alpha=0.001, normalize=True, max_iter=5000)
@@ -134,14 +160,26 @@ class SchoolRank(PricingModel):
 
 
 if __name__ =="__main__":
-    school_rank = SchoolRank()
+    single_model = SingleModel()
 
-    # # school_rank.preprocessing()
-    #
-    school_rank.feature_engineering()
-    school_rank.split_data()
+    single_model.preprocessing()
 
-    school_rank.train_lasso()
-    # school_rank.predict()
+    single_model.load_cleaned_data()
+    single_model.feature_engineering()
+    single_model.split_data()
+    single_model.train_lasso()
+    single_model.predict()
+    single_model.school_rank()
 
-    school_rank.school_rank()
+    single_model.load_cleaned_data()
+    ##single_model.feature_engineering()
+    single_model.split_data()
+    single_model.train_rf_regression()
+    single_model.predict()
+
+    single_model.load_cleaned_data()
+    ##single_model.feature_engineering()
+    single_model.split_data()
+    single_model.train_xgb()
+    single_model.predict()
+

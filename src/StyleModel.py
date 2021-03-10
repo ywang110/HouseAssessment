@@ -6,7 +6,7 @@ import xgboost as xgb
 import numpy as np
 
 
-class PricingModel(ModelInterface):
+class StyleModel(ModelInterface):
 
     def __init__(self):
         super().__init__()
@@ -19,13 +19,12 @@ class PricingModel(ModelInterface):
         self.model = {}
         self.all_styles = None
 
-    def feature_engineering(self):
-
+    def load_cleaned_data(self):
         ## load cleaned dataframe
         self.df = pd.read_csv(self.data_path + self.clean_file_name)
-
         self.all_styles = pd.unique(self.df['STYLEDESC'])
 
+    def feature_engineering(self):
         self.df = self.df.sort_values(by=['STYLEDESC', 'SCHOOLCODE', 'PROPERTYZIP', 'sale_year', 'sale_month_raw', 'sale_day'],
                                       ascending=True).reset_index(drop=True)
 
@@ -84,7 +83,7 @@ class PricingModel(ModelInterface):
 
     def train_rf_regression(self):
         # train one model for each style
-        self.model_name = 'rf_regression_model'
+        self.model_name = 'rf_regression_style_model'
         for style in self.all_styles:
             if style in self.model.keys():
                 self.model[style] = RandomForestRegressor(max_depth=2, random_state=0)
@@ -93,7 +92,7 @@ class PricingModel(ModelInterface):
 
     def train_xgb(self):
         # train one model for each style
-        self.model_name = 'xgb_model'
+        self.model_name = 'xgb_style_model'
         for style in self.all_styles:
             if style in self.model.keys():
                 self.model[style] = xgb.XGBRegressor(n_estimators=100, reg_lambda=1, gamma=0, max_depth=3)
@@ -102,7 +101,7 @@ class PricingModel(ModelInterface):
 
     def train_lasso(self):
         # train one model for each style
-        self.model_name = 'lasso_model'
+        self.model_name = 'lasso_style_model'
         for style in self.all_styles:
             self.model[style] = Lasso(alpha=0.001, normalize=True, max_iter=5000)
             self.model[style].fit(self.x_train[style], self.y_train[style])
@@ -120,18 +119,25 @@ class PricingModel(ModelInterface):
         print(self.model_name + " end")
 
 if __name__ =="__main__":
-    pricing_model = PricingModel()
+    style_model = StyleModel()
 
-    pricing_model.preprocessing()
-    pricing_model.feature_engineering()
-    pricing_model.split_data()
+    style_model.preprocessing()
 
-    pricing_model.train_lasso()
-    pricing_model.predict()
+    style_model.load_cleaned_data()
+    style_model.feature_engineering()
+    style_model.split_data()
+    style_model.train_lasso()
+    style_model.predict()
 
-    pricing_model.train_rf_regression()
-    pricing_model.predict()
+    style_model.load_cleaned_data()
+    ##style_model.feature_engineering_rf()
+    style_model.split_data()
+    style_model.train_rf_regression()
+    style_model.predict()
 
-    pricing_model.train_xgb()
-    pricing_model.predict()
+    style_model.load_cleaned_data()
+    style_model.feature_engineering()
+    style_model.split_data()
+    style_model.train_xgb()
+    style_model.predict()
 
