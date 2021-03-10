@@ -15,8 +15,7 @@ class QualityModel(StyleModel):
     def learn_quality(self, k=10):
 
         ##load model from trained lasso style model
-        self.model_name = "lasso_style_model"
-        self.load_model(self.model_name)
+        self.load_model("lasso_style_model")
 
         ##load cleaned dataframe
         self.df = pd.read_csv(self.data_path + self.clean_file_name)
@@ -91,15 +90,30 @@ class QualityModel(StyleModel):
             print(style, 'cnt: ', self.df_test_quality_model[style].shape[0], ' Quality Model median abs error: ',
                   np.median(self.df_test_quality_model[style]['error'].to_numpy()))
 
+    def predicted_to_file(self):
+        self.df_out = None
+        for style in self.all_styles:
+            df = pd.DataFrame(list(zip(self.df_test_quality_model[style].loc[:, 'sale_price_per_sf'].tolist(), self.df_test_quality_model[style].loc[:, 'y_hat'].tolist())), columns=['y', 'y_hat'])
+            df['model'] = "quality_model"
+            df['style'] = style
+
+            self.df_out = pd.concat([self.df_out, df], axis=0)
+
+        self.df_out.to_csv(self.data_path + "df_out_" + "quality_model" + ".csv", index=False)
+
+    def run(self):
+        self.preprocessing()
+
+        self.load_cleaned_data()
+        self.feature_engineering()
+        self.split_data()
+        self.train_lasso()
+
+        self.learn_quality()
+        self.predict()
+        self.predicted_to_file()
+
 if __name__ =="__main__":
     quality_model = QualityModel()
 
-    quality_model.preprocessing()
-
-    quality_model.load_cleaned_data()
-    quality_model.feature_engineering()
-    quality_model.split_data()
-    quality_model.train_lasso()
-
-    quality_model.learn_quality()
-    quality_model.predict()
+    quality_model.run()

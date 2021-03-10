@@ -114,6 +114,17 @@ class SingleModel(StyleModel):
               np.median(
                   abs(self.y_test - self.y_predicted) / self.y_test))
 
+    def predicted_to_file(self):
+        self.df_out = None
+        for style in self.all_styles:
+            df = pd.DataFrame(list(zip(self.y_test_per_style[style].tolist(), self.y_predicted_per_style[style])), columns=['y', 'y_hat'])
+            df['model'] = self.model_name
+            df['style'] = style
+
+            self.df_out = pd.concat([self.df_out, df], axis=0)
+
+        self.df_out.to_csv(self.data_path + 'df_out_' + self.model_name + ".csv", index=False)
+
     def school_rank(self):
         self.model = Lasso(alpha=0.001, normalize=True, max_iter=5000)
         self.model.fit(self.x_train, self.y_train)
@@ -158,28 +169,33 @@ class SingleModel(StyleModel):
 
         print(self.rank)
 
+    def run(self):
+        self.preprocessing()
+
+        self.load_cleaned_data()
+        self.feature_engineering()
+        self.split_data()
+        self.train_lasso()
+        self.predict()
+        self.predicted_to_file()
+
+        self.school_rank()
+
+        self.load_cleaned_data()
+        ##self.feature_engineering()
+        self.split_data()
+        self.train_rf_regression()
+        self.predict()
+        self.predicted_to_file()
+
+        self.load_cleaned_data()
+        ##self.feature_engineering()
+        self.split_data()
+        self.train_xgb()
+        self.predict()
+        self.predicted_to_file()
 
 if __name__ =="__main__":
     single_model = SingleModel()
 
-    single_model.preprocessing()
-
-    single_model.load_cleaned_data()
-    single_model.feature_engineering()
-    single_model.split_data()
-    single_model.train_lasso()
-    single_model.predict()
-    single_model.school_rank()
-
-    single_model.load_cleaned_data()
-    ##single_model.feature_engineering()
-    single_model.split_data()
-    single_model.train_rf_regression()
-    single_model.predict()
-
-    single_model.load_cleaned_data()
-    ##single_model.feature_engineering()
-    single_model.split_data()
-    single_model.train_xgb()
-    single_model.predict()
-
+    single_model.run()

@@ -118,26 +118,43 @@ class StyleModel(ModelInterface):
 
         print(self.model_name + " end")
 
+    def predicted_to_file(self):
+        self.df_out = None
+        for style in self.all_styles:
+            df = pd.DataFrame(list(zip(self.y_test[style].tolist(), self.y_predicted[style])), columns=['y', 'y_hat'])
+            df['model'] = self.model_name
+            df['style'] = style
+
+            self.df_out = pd.concat([self.df_out, df], axis=0)
+
+        self.df_out.to_csv(self.data_path + 'df_out_' + self.model_name + ".csv", index=False)
+
+    def run(self):
+        self.preprocessing()
+
+        self.load_cleaned_data()
+        self.feature_engineering()
+        self.split_data()
+        self.train_lasso()
+        self.predict()
+        self.predicted_to_file()
+
+        self.load_cleaned_data()
+        ##self.feature_engineering_rf()
+        self.split_data()
+        self.train_rf_regression()
+        self.predict()
+        self.predicted_to_file()
+
+        self.load_cleaned_data()
+        self.feature_engineering()
+        self.split_data()
+        self.train_xgb()
+        self.predict()
+        self.predicted_to_file()
+
+
 if __name__ =="__main__":
     style_model = StyleModel()
 
-    style_model.preprocessing()
-
-    style_model.load_cleaned_data()
-    style_model.feature_engineering()
-    style_model.split_data()
-    style_model.train_lasso()
-    style_model.predict()
-
-    style_model.load_cleaned_data()
-    ##style_model.feature_engineering_rf()
-    style_model.split_data()
-    style_model.train_rf_regression()
-    style_model.predict()
-
-    style_model.load_cleaned_data()
-    style_model.feature_engineering()
-    style_model.split_data()
-    style_model.train_xgb()
-    style_model.predict()
-
+    style_model.run()

@@ -1,10 +1,11 @@
-import os
 import pandas as pd
 import numpy as np
 from datetime import datetime
 import pickle
 import seaborn as sn
 import matplotlib.pyplot as plt
+import os
+
 from scipy.stats import pearsonr
 
 pd.set_option('display.max_rows', 100)
@@ -25,6 +26,7 @@ class ModelInterface:
         self.parentPath = os.path.abspath("../") + "/"
         self.data_path = self.parentPath + "data/"
         self.model_path = self.parentPath + "model/"
+        self.figure_path = self.parentPath + "figure/"
         self.from_year = 2000
         self.predict_years = 5
         self.df = None
@@ -38,6 +40,15 @@ class ModelInterface:
         self.y_test = None
         self.y_predicted = None
         self.model_name = None
+
+        self.df_out = None
+
+        if os.path.exists(self.data_path) is False:
+            os.mkdir(self.data_path)
+        if os.path.exists(self.figure_path) is False:
+            os.mkdir(self.figure_path)
+        if os.path.exists(self.model_path) is False:
+            os.mkdir(self.model_path)
 
     def load_model(self, file_name="model"):
         file_ptr = open(self.model_path + file_name, 'rb')
@@ -137,7 +148,11 @@ class ModelInterface:
             'LOTAREA'
         ]]
 
-    def adjust_order(self, feature_name='sale_quarter', response_name='sale_price_per_sf'):
+    """
+    Redo the feature encoding after sorting by response
+    A converting categorical data to numerical data step
+    """
+    def redo_encoding(self, feature_name='sale_quarter', response_name='sale_price_per_sf'):
 
         ## print(self.df[[feature_name, response_name]].groupby(feature_name).mean())
         df_mean = self.df[[feature_name, response_name]].groupby(feature_name).mean()
@@ -204,13 +219,8 @@ class ModelInterface:
         ## price per square feet
         self.df['sale_price_per_sf'] = self.df['SALEPRICE'] / self.df['FINISHEDLIVINGAREA']
 
-        ## adjust the order of some numbers based on plots
-        self.adjust_order('sale_quarter', self.response_col)
-        self.adjust_order('ROOF', self.response_col)
-
-        # keep copy of original sale month as sale_month_raw
-        self.df['sale_month_raw'] = self.df['sale_month']
-        self.adjust_order('sale_month', self.response_col)
+        # # plot
+        # self.plot_categorical_to_numerical("CONDITION")
 
         # convert some categorical data into numerical ones
         self.df['GRADE'] = self.df['GRADE'].replace({
@@ -229,19 +239,28 @@ class ModelInterface:
                                        'FR': 5, 'PR': 6, 'VP': 7, 'Unclear': 8
                                        })
 
+        ## adjust the order of some numbers based on plots
+        self.redo_encoding('sale_quarter', self.response_col)
+
+        self.redo_encoding('ROOF', self.response_col)
+
+        # keep copy of original sale month as sale_month_raw
+        self.df['sale_month_raw'] = self.df['sale_month']
+        self.redo_encoding('sale_month', self.response_col)
+
         # adjust the order for CDU
-        self.adjust_order('CDU', self.response_col)
+        self.redo_encoding('CDU', self.response_col)
 
         # adjust the order for CONDITION
-        self.adjust_order('CONDITION', self.response_col)
+        self.redo_encoding('CONDITION', self.response_col)
 
         # adjust the order for GRADE
-        self.adjust_order('GRADE', self.response_col)
+        self.redo_encoding('GRADE', self.response_col)
 
         # convert bath rooms
         self.df['bath'] = self.df['FULLBATHS'] + 0.5 * self.df['HALFBATHS']
         # adjust the order for bath
-        self.adjust_order('bath', self.response_col)
+        self.redo_encoding('bath', self.response_col)
 
         # ## outliner removal -- will do it later for each style
         # df['z_score_sale_price'] = abs(df['SALEPRICE'] - np.mean(df['SALEPRICE']))/np.std(df['SALEPRICE'])
@@ -271,19 +290,78 @@ class ModelInterface:
         fig1 = plt.figure(figsize=(6, 6))
 
         # adjust the order for x_name feature
-        self.adjust_order(x_name, "price")
+        self.redo_encoding(x_name, "price")
         ax = fig1.add_subplot(3, 1, 1)
         sn.lineplot(x=self.df[x_name], y=self.df['price'], ci=80, markers=True,
                     err_style="bars", legend='full', ax=ax, label=str('price'))
 
         # adjust the order for x_name feature
-        self.adjust_order(x_name, "log(price)")
+        self.redo_encoding(x_name, "log(price)")
         ax = fig1.add_subplot(3, 1, 2)
         sn.lineplot(x=self.df[x_name], y=self.df['log(price)'], ci=80, markers=True,
                     err_style="bars", legend='full', ax=ax, label=str('log(price)'))
 
         # # adjust the order for x_name feature
-        self.adjust_order(x_name, "price per square foot")
+        self.redo_encoding(x_name, "price per square foot")
         ax = fig1.add_subplot(3, 1, 3)
         sn.lineplot(x=self.df[x_name], y=self.df['price per square foot'], ci=80, markers=True,
                     err_style="bars", legend='full', ax=ax, label=str('price per square foot'))
+
+    def plot_categorical_to_numerical(self, x_name='GRADE'):
+
+        fig1 = plt.figure(figsize=(6, 6))
+
+        # before adjusting the order for x_name feature
+        ax = fig1.add_subplot(2, 1, 1)
+        sn.lineplot(x=self.df[x_name], y=self.df[self.response_col], ci=80, markers=True,
+                    err_style="bars", legend='full', ax=ax, label='categorical data')
+
+        ## adjust the order of some numbers based on plots
+        self.redo_encoding(x_name, self.response_col)
+
+        ## plot after adjusting order
+        ax = fig1.add_subplot(2, 1, 2)
+        sn.lineplot(x=self.df[x_name], y=self.df[self.response_col], ci=80, markers=True,
+                    err_style="bars", legend='full', ax=ax, label='numerical data')
+
+
+    def get_performance_metric(self):
+        df_all = None
+        for file in os.listdir(self.data_path):
+            if "df_out_" in file:
+                df = pd.read_csv(self.data_path + file)
+                df_all = pd.concat([df_all, df], axis=0)
+
+        if df_all is not None:
+            ##rename model names
+            df_all.loc[df_all["model"] == "quality_model", "model"] = "quality"
+            df_all.loc[df_all["model"] == "lasso_single_model", "model"] = "lasso one"
+            df_all.loc[df_all["model"] == "rfg_single_model", "model"] = "rf one"
+            df_all.loc[df_all["model"] == "xgb_single_model", "model"] = "xfb one"
+            df_all.loc[df_all["model"] == "lasso_style_model", "model"] = "lasso style"
+            df_all.loc[df_all["model"] == "rf_regression_style_model", "model"] = "rf style"
+            df_all.loc[df_all["model"] == "xgb_style_model", "model"] = "xgb style"
+
+            df_all['error_rate'] = abs(df_all['y'] - df_all['y_hat'])/df_all['y']
+
+            df_error_rate = df_all.groupby(["model"])["error_rate"].median().reset_index()
+
+            df_error_rate_per_style = df_all.groupby(["style", "model"])["error_rate"].median().reset_index()
+
+            fig1 = plt.figure(figsize=(6, 6))
+            fig1.add_subplot(1, 1, 1)
+            ax = sn.barplot(x="model", y="error_rate", data=df_error_rate)
+            ax.set_xticklabels(ax.get_xticklabels(), rotation=30)
+            ax.get_figure().savefig(self.figure_path + "all_model_error.png")
+
+            fig1 = plt.figure(figsize=(6, 6))
+            fig1.add_subplot(1, 1, 1)
+            ax = sn.barplot(x="style", y="error_rate", hue="model", data=df_error_rate_per_style)
+            ax.set_xticklabels(ax.get_xticklabels(), rotation=30)
+            ax.get_figure().savefig(self.figure_path + "style_model.png")
+
+
+if __name__ =="__main__":
+    model_interface = ModelInterface()
+
+    model_interface.get_performance_metric()
