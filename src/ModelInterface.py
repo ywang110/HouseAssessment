@@ -3,8 +3,15 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 import pickle
+import seaborn as sn
+import matplotlib.pyplot as plt
+from scipy.stats import pearsonr
 
+pd.set_option('display.max_rows', 100)
+pd.set_option('display.max_columns', 100)
+pd.set_option('display.width', 1000)
 pd.options.mode.chained_assignment = None
+
 
 class ModelInterface:
     """
@@ -13,6 +20,7 @@ class ModelInterface:
     def __init__(self):
         self.raw_file_name ="assessments.csv"
         self.clean_file_name ="df_cleaned.csv"
+        self.response_col = "sale_price_per_sf" #"SALEPRICE"
 
         self.parentPath = os.path.abspath("../") + "/"
         self.data_path = self.parentPath + "data/"
@@ -20,6 +28,7 @@ class ModelInterface:
         self.from_year = 2000
         self.predict_years = 5
         self.df = None
+        self.df_plt = None
         self.df_train = None
         self.df_test = None
         self.model = None
@@ -59,21 +68,14 @@ class ModelInterface:
         ## combine current sale price and previous sale prices
         self.df = pd.concat([df_curr_sale, df_prev_sale, df_prev_sale_2]).reset_index(drop=True)
 
-        ##
+        ## filter
         self._filter()
 
-        ##
+        ## transform features
         self._transformation()
-
-        # print(df)
 
         ## save data as cleaned dataframe
         self.df.to_csv(self.data_path + self.clean_file_name, index=False)
-
-        # ax = sn.lineplot(x['years_to_sale'], y / max(y), ci=80)
-        # ax = sn.lineplot(x2['years_to_sale'], y2 / max(y2), ci=80)
-        # ax = sn.lineplot(np.log(x['years_to_sale']), y / max(y), ci=80)
-        # ax = sn.lineplot(np.log(x2['years_to_sale']), y2 / max(y2), ci=80)
 
     def _filter(self):
 
@@ -99,7 +101,7 @@ class ModelInterface:
 
         self.df = self.df[filter_mask].reset_index(drop=True)
 
-        ## mannully select input raw data
+        ## input raw data
         self.df = self.df[[
             'PROPERTYZIP',
             'SCHOOLCODE',
@@ -134,6 +136,17 @@ class ModelInterface:
             'FINISHEDLIVINGAREA',
             'LOTAREA'
         ]]
+
+    def adjust_order(self, feature_name='sale_quarter', response_name='sale_price_per_sf'):
+
+        ## print(self.df[[feature_name, response_name]].groupby(feature_name).mean())
+        df_mean = self.df[[feature_name, response_name]].groupby(feature_name).mean()
+        new_index = df_mean.index.to_list()
+        df_mean.sort_values(by=[response_name], inplace=True)
+        old_index = df_mean.index.to_list()
+        self.df[feature_name] = self.df[feature_name].replace(old_index, new_index)
+        ## print(self.df[[feature_name, response_name]].groupby(feature_name).mean())
+
 
     def _transformation(self):
 
@@ -186,36 +199,18 @@ class ModelInterface:
         self.df['FIREPLACES'] = self.df['FIREPLACES'].apply(int)
         self.df['BSMTGARAGE'] = self.df['BSMTGARAGE'].apply(int)
         self.df['LOTAREA'] = self.df['LOTAREA'].apply(int)
+        # self.df['EXTERIORFINISH'] = self.df['EXTERIORFINISH'].apply(int)
 
-        # get sale price per square feet
+        ## price per square feet
         self.df['sale_price_per_sf'] = self.df['SALEPRICE'] / self.df['FINISHEDLIVINGAREA']
 
         ## adjust the order of some numbers based on plots
-        print(self.df[['sale_quarter', 'sale_price_per_sf']].groupby("sale_quarter").mean())
-        df_mean = self.df[['sale_quarter', 'sale_price_per_sf']].groupby("sale_quarter").mean()
-        new_index = df_mean.index.to_list()
-        df_mean.sort_values(by=['sale_price_per_sf'], inplace=True)
-        old_index = df_mean.index.to_list()
-        self.df['sale_quarter'] = self.df['sale_quarter'].replace(old_index, new_index)
-
-        # adjust the order for roof
-        print(self.df[['ROOF', 'sale_price_per_sf']].groupby("ROOF").mean())
-        df_mean = self.df[['ROOF', 'sale_price_per_sf']].groupby("ROOF").mean()
-        new_index = df_mean.index.to_list()
-        df_mean.sort_values(by=['sale_price_per_sf'], inplace=True)
-        old_index = df_mean.index.to_list()
-        self.df['ROOF'] = self.df['ROOF'].replace(old_index, new_index)
+        self.adjust_order('sale_quarter', self.response_col)
+        self.adjust_order('ROOF', self.response_col)
 
         # keep copy of original sale month as sale_month_raw
         self.df['sale_month_raw'] = self.df['sale_month']
-
-        # adjust the order for sale month
-        print(self.df[['sale_month', 'sale_price_per_sf']].groupby("sale_month").mean())
-        df_mean = self.df[['sale_month', 'sale_price_per_sf']].groupby("sale_month").mean()
-        new_index = df_mean.index.to_list()
-        df_mean.sort_values(by=['sale_price_per_sf'], inplace=True)
-        old_index = df_mean.index.to_list()
-        self.df['sale_month'] = self.df['sale_month'].replace(old_index, new_index)
+        self.adjust_order('sale_month', self.response_col)
 
         # convert some categorical data into numerical ones
         self.df['GRADE'] = self.df['GRADE'].replace({
@@ -230,24 +225,34 @@ class ModelInterface:
                                            })
 
         self.df['CDU'] = self.df['CDU'].replace({
-                                       'EX': 1, 'VG': 2, 'GD': 3, 'AV': 4,
-                                       'FR': 5, 'PR': 6, 'VP': 7, 'UN': 8,
-                                       'Unclear': 9
+                                       'UN': 0, 'EX': 1, 'VG': 2, 'GD': 3, 'AV': 4,
+                                       'FR': 5, 'PR': 6, 'VP': 7, 'Unclear': 8
                                        })
+
+        # adjust the order for CDU
+        self.adjust_order('CDU', self.response_col)
+
+        # adjust the order for CONDITION
+        self.adjust_order('CONDITION', self.response_col)
+
+        # adjust the order for GRADE
+        self.adjust_order('GRADE', self.response_col)
 
         # convert bath rooms
         self.df['bath'] = self.df['FULLBATHS'] + 0.5 * self.df['HALFBATHS']
+        # adjust the order for bath
+        self.adjust_order('bath', self.response_col)
 
-        # ## outliner removal
+        # ## outliner removal -- will do it later for each style
         # df['z_score_sale_price'] = abs(df['SALEPRICE'] - np.mean(df['SALEPRICE']))/np.std(df['SALEPRICE'])
         # df = df[df['z_score_sale_price'] < 3].reset_index(drop=True)
 
-        ## log transformation
-        self.df['CDU'] = np.log(self.df['CDU'])
-        self.df['CONDITION'] = np.log(self.df['CONDITION'])
-        self.df['GRADE'] = np.log(self.df['GRADE'])
-        mask_tmp = (self.df['LOTAREA'] > 0)
-        self.df.loc[mask_tmp, 'LOTAREA'] = np.log(self.df.loc[mask_tmp, 'LOTAREA'])
+        # ## feature log transformation, does not work well
+        # self.df['CDU'] = np.log(self.df['CDU'])
+        # self.df['CONDITION'] = np.log(self.df['CONDITION'])
+        # self.df['GRADE'] = np.log(self.df['GRADE'])
+        # mask_tmp = (self.df['LOTAREA'] > 0)
+        # self.df.loc[mask_tmp, 'LOTAREA'] = np.log(self.df.loc[mask_tmp, 'LOTAREA'])
 
         ## remove raw features which have been preprocessing
         self.df = self.df[self.df.columns[
@@ -255,3 +260,30 @@ class ModelInterface:
 
         self.df = self.df.sort_values(by=['STYLEDESC', 'SCHOOLCODE', 'PROPERTYZIP', 'sale_year', 'sale_month_raw', 'sale_day'],
                             ascending=True).reset_index(drop=True)
+
+
+    def plot_compare_response(self, x_name='GRADE'):
+
+        self.df['price'] = self.df['SALEPRICE'] / max(self.df['SALEPRICE'])
+        self.df['log(price)'] = np.log(self.df['SALEPRICE']) / max(np.log(self.df['SALEPRICE']))
+        self.df['price per square foot'] = self.df['sale_price_per_sf'] / max(self.df['sale_price_per_sf'])
+
+        fig1 = plt.figure(figsize=(6, 6))
+
+        # adjust the order for x_name feature
+        self.adjust_order(x_name, "price")
+        ax = fig1.add_subplot(3, 1, 1)
+        sn.lineplot(x=self.df[x_name], y=self.df['price'], ci=80, markers=True,
+                    err_style="bars", legend='full', ax=ax, label=str('price'))
+
+        # adjust the order for x_name feature
+        self.adjust_order(x_name, "log(price)")
+        ax = fig1.add_subplot(3, 1, 2)
+        sn.lineplot(x=self.df[x_name], y=self.df['log(price)'], ci=80, markers=True,
+                    err_style="bars", legend='full', ax=ax, label=str('log(price)'))
+
+        # # adjust the order for x_name feature
+        self.adjust_order(x_name, "price per square foot")
+        ax = fig1.add_subplot(3, 1, 3)
+        sn.lineplot(x=self.df[x_name], y=self.df['price per square foot'], ci=80, markers=True,
+                    err_style="bars", legend='full', ax=ax, label=str('price per square foot'))

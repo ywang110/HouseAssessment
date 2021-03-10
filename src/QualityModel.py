@@ -84,7 +84,8 @@ class QualityModel(PricingModel):
             ## use only testing data set
             self.df_test_quality_model[style] = self.df_quality_model[style][self.df_quality_model[style]['years_to_sale'] <= self.predict_years]
 
-            self.df_test_quality_model[style].loc[:, 'error'] = abs(self.df_test_quality_model[style].loc[:, 'y_hat'] - self.df_test_quality_model[style].loc[:, 'sale_price_per_sf']) / self.df_test_quality_model[style].loc[:,'sale_price_per_sf']
+            ##self.df_test_quality_model[style].loc[:, 'error'] = abs(np.exp(self.df_test_quality_model[style].loc[:, 'y_hat']) - np.exp(self.df_test_quality_model[style].loc[:, 'sale_price_per_sf'])) / np.exp(self.df_test_quality_model[style].loc[:,'sale_price_per_sf'])
+            self.df_test_quality_model[style].loc[:, 'error'] = abs(self.df_test_quality_model[style].loc[:, 'y_hat'] - self.df_test_quality_model[style].loc[:, 'sale_price_per_sf']) / self.df_test_quality_model[style].loc[:, 'sale_price_per_sf']
             self.df_test_quality_model[style].sort_values(by=['error'], inplace=True)
             print(style, 'cnt: ', self.df_test_quality_model[style].shape[0], ' Quality Model median abs error: ',
                   np.median(self.df_test_quality_model[style]['error'].to_numpy()))
@@ -92,10 +93,10 @@ class QualityModel(PricingModel):
 if __name__ =="__main__":
     quality_model = QualityModel()
 
-    # quality_model.preprocessing()
-    # quality_model.feature_engineering()
-    # quality_model.split_data()
-    # quality_model.train_lasso()
+    quality_model.preprocessing()
+    quality_model.feature_engineering()
+    quality_model.split_data()
+    quality_model.train_lasso()
 
     quality_model.learn_quality()
     quality_model.predict()

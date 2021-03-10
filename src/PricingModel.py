@@ -110,10 +110,14 @@ class PricingModel(ModelInterface):
 
     def predict(self):
         self.load_model(self.model_name)
+        print(self.model_name + " start")
         for style in self.all_styles:
             self.y_predicted[style] = self.model[style].predict(self.x_test[style])
-            print(style, 'cnt: ', self.y_test[style].shape[0], ' ', self.model_name,' median abs error: ', np.median(abs(self.y_test[style] - self.y_predicted[style]) / self.y_test[style]))
+            ##print(style, 'cnt: ', self.y_test[style].shape[0], ' ', self.model_name,' median abs error: ', np.median(abs(np.exp(self.y_test[style]) - np.exp(self.y_predicted[style])) / np.exp(self.y_test[style])))
+            print(style, 'cnt: ', self.y_test[style].shape[0], ' ', self.model_name, ' median abs error: ',
+              np.median(abs(self.y_test[style] - self.y_predicted[style]) / self.y_test[style]))
 
+        print(self.model_name + " end")
 
 if __name__ =="__main__":
     pricing_model = PricingModel()
