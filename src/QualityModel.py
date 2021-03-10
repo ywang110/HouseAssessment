@@ -95,6 +95,8 @@ if __name__ =="__main__":
     quality_model = QualityModel()
 
     quality_model.preprocessing()
+
+    quality_model.load_cleaned_data()
     quality_model.feature_engineering()
     quality_model.split_data()
     quality_model.train_lasso()
