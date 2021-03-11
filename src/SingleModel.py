@@ -154,7 +154,7 @@ class SingleModel(StyleModel):
         ## load cleaned dataframe
         df = pd.read_csv(self.data_path + self.clean_file_name)
         df_train = df[df['years_to_sale'] > self.predict_years]
-        school_rank_by_price = df_train.groupby(['SCHOOLCODE'])['SCHOOLCODE', 'sale_price_per_sf'].mean()
+        school_rank_by_price = df_train.groupby(['SCHOOLCODE'])['SCHOOLCODE', 'sale_price_per_sf'].median()
         school_rank_by_price.reset_index(drop=True, inplace=True)
 
         school_rank_by_price.sort_values(['sale_price_per_sf'], ascending=False, inplace=True)

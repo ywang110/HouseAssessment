@@ -6,8 +6,6 @@ import seaborn as sn
 import matplotlib.pyplot as plt
 import os
 
-from scipy.stats import pearsonr
-
 pd.set_option('display.max_rows', 100)
 pd.set_option('display.max_columns', 100)
 pd.set_option('display.width', 1000)
@@ -21,7 +19,7 @@ class ModelInterface:
     def __init__(self):
         self.raw_file_name ="assessments.csv"
         self.clean_file_name ="df_cleaned.csv"
-        self.response_col = "sale_price_per_sf" #"SALEPRICE"
+        self.response_col = "sale_price_per_sf"
 
         self.parentPath = os.path.abspath("../") + "/"
         self.data_path = self.parentPath + "data/"
@@ -88,6 +86,9 @@ class ModelInterface:
         ## save data as cleaned dataframe
         self.df.to_csv(self.data_path + self.clean_file_name, index=False)
 
+    """
+    a manual filter to select data set
+    """
     def _filter(self):
 
         # filters out noises:
@@ -116,7 +117,6 @@ class ModelInterface:
         self.df = self.df[[
             'PROPERTYZIP',
             'SCHOOLCODE',
-            # 'NEIGHCODE',
             'SALEPRICE',
             'SALEDATE',
             # 'PREVSALEPRICE',
@@ -132,7 +132,6 @@ class ModelInterface:
             'STYLEDESC',
             'STORIES',
             'YEARBLT',
-            # 'EXTERIORFINISH',
             'ROOF',
             'BASEMENT',
             'GRADE',
@@ -141,12 +140,12 @@ class ModelInterface:
             'BEDROOMS',
             'FULLBATHS',
             'HALFBATHS',
-            # 'HEATINGCOOLING',
             'FIREPLACES',
             'BSMTGARAGE',
             'FINISHEDLIVINGAREA',
             'LOTAREA'
         ]]
+
 
     """
     Redo the feature encoding after sorting by response
@@ -163,6 +162,9 @@ class ModelInterface:
         ## print(self.df[[feature_name, response_name]].groupby(feature_name).mean())
 
 
+    """
+    transform the data inclluding nan filing, data convertion, encoding, log transformation, etc
+    """
     def _transformation(self):
 
         # how many years since built
@@ -261,6 +263,23 @@ class ModelInterface:
         self.df['bath'] = self.df['FULLBATHS'] + 0.5 * self.df['HALFBATHS']
         # adjust the order for bath
         self.redo_encoding('bath', self.response_col)
+
+        # ## normalize for feature importance
+        # self.df['sale_quarter'] = self.df['sale_quarter'] / max(self.df['sale_quarter'])
+        # self.df['sale_month'] = self.df['sale_month'] / max(self.df['sale_month'])
+        # self.df['CDU'] = self.df['CDU'] / max(self.df['CDU'])
+        # self.df['GRADE'] = self.df['GRADE'] / max(self.df['GRADE'])
+        # self.df['bath'] = self.df['bath'] / max(self.df['bath'])
+        # self.df['years_to_sale'] = self.df['years_to_sale'] / max(self.df['years_to_sale'])
+        # self.df['years_built'] = self.df['years_built'] / max(self.df['years_built'])
+        # self.df['STORIES'] = self.df['STORIES']/max( self.df['STORIES'])
+        # self.df['CONDITION'] = self.df['CONDITION']/max( self.df['CONDITION'])
+        # self.df['BEDROOMS'] = self.df['BEDROOMS']/max( self.df['BEDROOMS'])
+        # self.df['BASEMENT'] = self.df['BASEMENT']/max( self.df['BASEMENT'])
+        # self.df['ROOF'] = self.df['ROOF']/max( self.df['ROOF'])
+        # self.df['FIREPLACES'] = self.df['FIREPLACES']/max( self.df['FIREPLACES'])
+        # self.df['BSMTGARAGE'] = self.df['BSMTGARAGE']/max( self.df['BSMTGARAGE'])
+        # self.df['LOTAREA'] = self.df['LOTAREA']/max( self.df['LOTAREA'])
 
         # ## outliner removal -- will do it later for each style
         # df['z_score_sale_price'] = abs(df['SALEPRICE'] - np.mean(df['SALEPRICE']))/np.std(df['SALEPRICE'])
